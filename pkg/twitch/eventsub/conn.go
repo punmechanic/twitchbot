@@ -23,7 +23,7 @@ func Dial(ctx context.Context, options ...Option) (*Conn, error) {
 
 	conn := &Conn{
 		r:      ws,
-		Events: make(chan json.RawMessage),
+		Events: make(chan Notification),
 	}
 
 	for _, opt := range options {
@@ -38,7 +38,7 @@ func Dial(ctx context.Context, options ...Option) (*Conn, error) {
 // Websocket connections to the Eventsub API are read-only. Receive Events from the Events channel, and then respond to them using the Twitch API.
 type Conn struct {
 	// Events is a channel that can be read from to poll events from the Conn.
-	Events chan json.RawMessage
+	Events chan Notification
 
 	r io.ReadCloser
 
@@ -61,7 +61,12 @@ func (c *Conn) serveMessage(msg *message) error {
 
 	case "keepalive":
 	case "notification":
-		// Events go here.
+		var payload Notification
+		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			return err
+		}
+
+		c.Events <- payload
 	}
 
 	return nil
