@@ -1,36 +1,31 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
+	"context"
 	"log"
 
+	"example.com/twitchbot/pkg/twitch"
 	"example.com/twitchbot/pkg/twitch/eventsub"
-	"golang.org/x/net/websocket"
 )
 
 func main() {
-	conn, err := websocket.Dial("wss://eventsub.wss.twitch.tv/ws", "wss", "wss://eventsub.wss.twitch.tv/ws")
+	var client twitch.Client
+	conn, err := eventsub.Dial(
+		context.Background(),
+		eventsub.WithSubscriptions([]string{"channel_follow"}, &client),
+	)
 	if err != nil {
 		log.Fatalf("init websocket: %s", err)
 	}
-	defer conn.Close()
 
-	err = Loop(conn, conn)
-	if err != nil {
-		log.Fatalf("loop: %s", err)
-	}
-}
-
-func Loop(w io.Writer, r io.Reader) error {
-	// enc := json.NewEncoder(conn)
-	dec := json.NewDecoder(r)
-	for {
-		var msg eventsub.Message
-		if err := dec.Decode(&msg); err != nil {
-			return err
+	go func() {
+		for event := range conn.Events {
+			log.Printf("%#v", event)
 		}
+	}()
 
-		log.Printf("%#v", msg)
+	err = conn.Listen()
+	if err != nil {
+		log.Fatalf("closed with error: %s", err)
 	}
 }
