@@ -3,9 +3,11 @@ package eventsub
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 
+	"example.com/twitchbot/pkg/twitch/events"
 	"golang.org/x/net/websocket"
 )
 
@@ -20,9 +22,9 @@ func Dial(ctx context.Context) (*Conn, error) {
 	}
 
 	conn := &Conn{
-		r:             ws,
-		Notifications: make(chan Notification),
-		SessionID:     make(chan string, 1),
+		r:               ws,
+		SessionID:       make(chan string, 1),
+		ChannelFollowed: make(chan events.ChannelFollow),
 	}
 
 	return conn, err
@@ -38,9 +40,28 @@ type Conn struct {
 	//
 	// You should capture values from this channel and present them to the Twitch API to register subscriptions; without subscriptions, the Conn will be disconnected after 10 seconds.
 	SessionID chan string
-	// Notifications is a channel that can be read from to poll events from the Conn.
-	Notifications chan Notification
-	r             io.ReadCloser
+	r         io.ReadCloser
+
+	ChannelFollowed chan events.ChannelFollow
+}
+
+func (c *Conn) processNotification(notification *Notification) error {
+	// Parse the notification data, and then pass it to the appropriate channels.
+	var (
+		channelFollow events.ChannelFollow
+	)
+
+	switch typ := notification.Subscription.Type; typ {
+	case "channel_follow":
+		if err := json.Unmarshal(notification.Event, &channelFollow); err != nil {
+			return err
+		}
+		c.ChannelFollowed <- channelFollow
+	default:
+		return fmt.Errorf("unknown subscription type %q", typ)
+	}
+
+	return nil
 }
 
 func (c *Conn) serveMessage(_ context.Context, msg *message) error {
@@ -59,7 +80,10 @@ func (c *Conn) serveMessage(_ context.Context, msg *message) error {
 			return err
 		}
 
-		c.Notifications <- payload
+		err := c.processNotification(&payload)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
