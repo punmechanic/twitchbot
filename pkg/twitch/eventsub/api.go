@@ -10,8 +10,19 @@ type Requestor interface {
 	NewRequest(ctx context.Context, method, path string, data any) (*http.Request, error)
 }
 
-func Subscribe(ctx context.Context, requestor Requestor, req *CreateEventSubSubscriptionRequest) (*CreateEventSubSubscriptionResponse, error) {
-	var data CreateEventSubSubscriptionResponse
+type SubscribeRequest struct {
+	Subscriptions []*SubscriptionDefinition `json:"subscriptions"`
+}
+
+type SubscribeResponse struct {
+	Data         []Subscription `json:"data"`
+	Total        int            `json:"total"`
+	TotalCost    int            `json:"total_cost"`
+	MaxTotalCost int            `json:"max_total_cost"`
+}
+
+func Subscribe(ctx context.Context, requestor Requestor, req *SubscribeRequest) (*SubscribeResponse, error) {
+	var data SubscribeResponse
 	r, err := requestor.NewRequest(ctx, "POST", "/helix/eventsub/subscriptions", req)
 	if err != nil {
 		return nil, err

@@ -8,13 +8,13 @@ import (
 )
 
 func (c *Client) SubscribeEvents(ctx context.Context, sessionID string, events []string) error {
-	var req eventsub.CreateEventSubSubscriptionRequest
+	var req eventsub.SubscribeRequest
 	for _, event := range events {
-		req.Subscriptions = append(req.Subscriptions, &eventsub.SubscriptionRequest{
+		req.Subscriptions = append(req.Subscriptions, &eventsub.SubscriptionDefinition{
 			Type:    event,
 			Version: "1",
-			Transport: eventsub.SubscriptionTransport{
-				Method:    eventsub.SubscriptionMethodWebhook,
+			Transport: eventsub.Transport{
+				Method:    eventsub.MethodWebhook,
 				SessionID: sessionID,
 			},
 		})

@@ -4,35 +4,24 @@ import (
 	"time"
 )
 
-type CreateEventSubSubscriptionRequest struct {
-	Subscriptions []*SubscriptionRequest
-}
-
-type CreateEventSubSubscriptionResponse struct {
-	Data         []Subscription `json:"data"`
-	Total        int            `json:"total"`
-	TotalCost    int            `json:"total_cost"`
-	MaxTotalCost int            `json:"max_total_cost"`
-}
+type Method string
 
 var (
-	SubscriptionMethodWebhook   SubscriptionMethod = "webhook"
-	SubscriptionMethodWebsocket SubscriptionMethod = "websocket"
-	SubscriptionMethodConduit   SubscriptionMethod = "conduit"
+	MethodWebhook   Method = "webhook"
+	MethodWebsocket Method = "websocket"
+	MethodConduit   Method = "conduit"
 )
 
 var (
-	SubscriptionStatusEnabled                            SubscriptionStatus = "enabled"
-	SubscriptionStatusWebhookCallbackVerificationPending SubscriptionStatus = "webhook_callback_verification_pending"
+	StatusEnabled                            Status = "enabled"
+	StatusWebhookCallbackVerificationPending Status = "webhook_callback_verification_pending"
 )
 
-type SubscriptionMethod string
+type Status string
 
-type SubscriptionStatus string
-
-type SubscriptionCondition struct{}
-type SubscriptionTransport struct {
-	Method SubscriptionMethod `json:"method"`
+type Condition struct{}
+type Transport struct {
+	Method Method `json:"method"`
 
 	// Callback is the callback URL where the notifications are sent. The URL must use the HTTPS protocol and port 443. See Processing an event. Specify this field only if method is set to webhook.
 	//
@@ -50,21 +39,21 @@ type SubscriptionTransport struct {
 }
 
 type Subscription struct {
-	ID          string                `json:"id"`
-	Status      SubscriptionStatus    `json:"status"`
-	Type        string                `json:"type"`
-	Version     string                `json:"version"`
-	Condition   SubscriptionCondition `json:"condition"`
-	CreatedAt   time.Time             `json:"created_at"`
-	Transport   SubscriptionTransport `json:"transport"`
-	ConnectedAt time.Time             `json:"connected_at"`
-	ConduitID   string                `json:"conduit_id"`
-	Cost        int                   `json:"cost"`
+	ID          string    `json:"id"`
+	Status      Status    `json:"status"`
+	Type        string    `json:"type"`
+	Version     string    `json:"version"`
+	Condition   Condition `json:"condition"`
+	CreatedAt   time.Time `json:"created_at"`
+	Transport   Transport `json:"transport"`
+	ConnectedAt time.Time `json:"connected_at"`
+	ConduitID   string    `json:"conduit_id"`
+	Cost        int       `json:"cost"`
 }
 
-type SubscriptionRequest struct {
-	Type      string                `json:"type"`
-	Version   string                `json:"version"`
-	Condition SubscriptionCondition `json:"condition"`
-	Transport SubscriptionTransport `json:"transport"`
+type SubscriptionDefinition struct {
+	Type      string    `json:"type"`
+	Version   string    `json:"version"`
+	Condition Condition `json:"condition"`
+	Transport Transport `json:"transport"`
 }
