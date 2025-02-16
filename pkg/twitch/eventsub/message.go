@@ -28,20 +28,6 @@ type welcome struct {
 
 type keepalive struct{}
 
-type Subscription struct {
-	ID        string            `json:"id"`
-	Status    string            `json:"status"`
-	Type      string            `json:"type"`
-	Version   string            `json:"version"`
-	Cost      string            `json:"cost"`
-	Condition map[string]string `json:"condition"`
-	Transport struct {
-		Method    string `json:"string"`
-		SessionID string `json:"session_id"`
-	} `json:"transport"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 type Notification struct {
 	Subscription Subscription    `json:"subscription"`
 	Event        json.RawMessage `json:"event"`

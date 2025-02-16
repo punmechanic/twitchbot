@@ -3,11 +3,9 @@ package eventsub
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 
-	"example.com/twitchbot/pkg/twitch"
 	"golang.org/x/net/websocket"
 )
 
@@ -15,19 +13,16 @@ type state struct {
 	SessionID string
 }
 
-func Dial(ctx context.Context, options ...Option) (*Conn, error) {
+func Dial(ctx context.Context) (*Conn, error) {
 	ws, err := websocket.Dial("wss://eventsub.wss.twitch.tv/ws", "wss", "wss://eventsub.wss.twitch.tv/ws")
 	if err != nil {
 		log.Fatalf("init websocket: %s", err)
 	}
 
 	conn := &Conn{
-		r:      ws,
-		Events: make(chan Notification),
-	}
-
-	for _, opt := range options {
-		opt(conn)
+		r:             ws,
+		Notifications: make(chan Notification),
+		SessionID:     make(chan string, 1),
 	}
 
 	return conn, err
@@ -35,18 +30,20 @@ func Dial(ctx context.Context, options ...Option) (*Conn, error) {
 
 // Conn is a websocket connection to the eventsub API.
 //
-// Websocket connections to the Eventsub API are read-only. Receive Events from the Events channel, and then respond to them using the Twitch API.
+// Websocket connections to the Eventsub API are read-only. Receive notifications from the Notifications channel, and then respond to them using the Twitch API.
 type Conn struct {
-	// Events is a channel that can be read from to poll events from the Conn.
-	Events chan Notification
-
-	r io.ReadCloser
-
-	subscriptions []string
-	client        *twitch.Client
+	// SessionID is a channel that can be interrogated to retrieve the session id of the Conn.
+	//
+	// This will receive something every time the Conn receives a session_welcome event, which means it may occur if the session reconnects.
+	//
+	// You should capture values from this channel and present them to the Twitch API to register subscriptions; without subscriptions, the Conn will be disconnected after 10 seconds.
+	SessionID chan string
+	// Notifications is a channel that can be read from to poll events from the Conn.
+	Notifications chan Notification
+	r             io.ReadCloser
 }
 
-func (c *Conn) serveMessage(msg *message) error {
+func (c *Conn) serveMessage(_ context.Context, msg *message) error {
 	switch msg.Metadata.MessageType {
 	case "session_welcome":
 		var payload welcome
@@ -54,11 +51,7 @@ func (c *Conn) serveMessage(msg *message) error {
 			return err
 		}
 
-		err := c.setupSubscriptions(payload.Session.ID)
-		if err != nil {
-			return fmt.Errorf("subscribe: %w", err)
-		}
-
+		c.SessionID <- payload.Session.ID
 	case "keepalive":
 	case "notification":
 		var payload Notification
@@ -66,13 +59,16 @@ func (c *Conn) serveMessage(msg *message) error {
 			return err
 		}
 
-		c.Events <- payload
+		c.Notifications <- payload
 	}
 
 	return nil
 }
 
 func (c *Conn) Listen() error {
+	// Placeholder context that isn't used for anything.
+	// One might use this to enforce timeouts on message handling.
+	ctx := context.Background()
 	dec := json.NewDecoder(c.r)
 	for {
 		var msg message
@@ -80,23 +76,9 @@ func (c *Conn) Listen() error {
 			return err
 		}
 
-		err := c.serveMessage(&msg)
+		err := c.serveMessage(ctx, &msg)
 		if err != nil {
 			return err
 		}
-	}
-}
-
-func (c *Conn) setupSubscriptions(sessionID string) error {
-	// TODO: impl
-	return nil
-}
-
-type Option func(*Conn)
-
-func WithSubscriptions(events []string, client *twitch.Client) Option {
-	return func(c *Conn) {
-		c.subscriptions = events
-		c.client = client
 	}
 }
