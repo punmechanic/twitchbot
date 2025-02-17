@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -28,6 +29,7 @@ func (*Client) NewRequest(ctx context.Context, method, path string, data any) (*
 		return nil, err
 	}
 
+	log.Println(string(buf))
 	req, err := http.NewRequestWithContext(ctx, method, uri.String(), bytes.NewReader(buf))
 	if err != nil {
 		return nil, err

@@ -19,7 +19,10 @@ var (
 
 type Status string
 
-type Condition struct{}
+type Condition struct {
+	UserID string `json:"user_id,omitempty"`
+}
+
 type Transport struct {
 	Method Method `json:"method"`
 
@@ -49,11 +52,4 @@ type Subscription struct {
 	ConnectedAt time.Time `json:"connected_at"`
 	ConduitID   string    `json:"conduit_id"`
 	Cost        int       `json:"cost"`
-}
-
-type SubscriptionDefinition struct {
-	Type      string    `json:"type"`
-	Version   string    `json:"version"`
-	Condition Condition `json:"condition"`
-	Transport Transport `json:"transport"`
 }

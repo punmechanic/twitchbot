@@ -11,7 +11,10 @@ type Requestor interface {
 }
 
 type SubscribeRequest struct {
-	Subscriptions []*SubscriptionDefinition `json:"subscriptions"`
+	Type      string    `json:"type"`
+	Version   string    `json:"version"`
+	Condition Condition `json:"condition"`
+	Transport Transport `json:"transport"`
 }
 
 type SubscribeResponse struct {
