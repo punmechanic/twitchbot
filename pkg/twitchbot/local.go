@@ -20,7 +20,7 @@ func runLocal(ctx context.Context) error {
 	//
 	// tbh the latter is likely more approachable for most twitch users.
 	cfg := oauth2.Config{
-		ClientID: "??",
+		ClientID: "55diy5xuogxpd3eqo1hcmpirt57zis",
 		// From https://id.twitch.tv/oauth2/.well-known/openid-configuration
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  "https://id.twitch.tv/oauth2/authorize",
