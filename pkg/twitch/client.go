@@ -8,15 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	"golang.org/x/oauth2"
 )
 
-type Authorization interface {
-	Apply(r *http.Request) error
-}
-
 type Client struct {
-	Authorization Authorization
-	HttpClient    *http.Client
+	Config     *oauth2.Config
+	HttpClient *http.Client
 }
 
 func (*Client) NewRequest(ctx context.Context, method, path string, data any) (*http.Request, error) {
@@ -40,9 +38,7 @@ func (*Client) NewRequest(ctx context.Context, method, path string, data any) (*
 
 func (c *Client) Execute(ctx context.Context, r *http.Request, dst any) error {
 	r2 := r.Clone(ctx)
-	if err := c.Authorization.Apply(r2); err != nil {
-		return fmt.Errorf("authorization error: %w", err)
-	}
+	r.Header.Set("X-Client-Id", c.Config.ClientID)
 
 	resp, err := c.HttpClient.Do(r2)
 	if err != nil {
@@ -86,9 +82,9 @@ func parseResponse(resp *http.Response, dst any) error {
 	return json.Unmarshal(buf, dst)
 }
 
-func New(auth Authorization) *Client {
+func New(cfg *oauth2.Config, initialToken *oauth2.Token) *Client {
 	return &Client{
-		Authorization: auth,
-		HttpClient:    http.DefaultClient,
+		Config:     cfg,
+		HttpClient: cfg.Client(context.Background(), initialToken),
 	}
 }
