@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
@@ -57,7 +58,28 @@ func runServerForCallback(ctx context.Context, cfg *oauth2.Config, ch <-chan tok
 	return server.ListenAndServe()
 }
 
-func fetchInitialToken(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token, error) {
+func initTwitchConfig() *oauth2.Config {
+	// Twitch seems to let us do localhost during test but I don't know if they would allow it in production...
+	//
+	// If not, that means spinning up complex infrastructure where we have an Oauth2 flow that the twitch bot (conduit,
+	// I guess) uses to interact w/ twitch and we have to develop a client the end-user can use to interact with ours,
+	// and that client would use the public flow
+	//
+	// tbh the latter is likely more approachable for most twitch users.
+	return &oauth2.Config{
+		ClientID:     os.Getenv("TWITCH_CLIENT_ID"),
+		ClientSecret: os.Getenv("TWITCH_CLIENT_SECRET"),
+		// From https://id.twitch.tv/oauth2/.well-known/openid-configuration
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://id.twitch.tv/oauth2/authorize",
+			TokenURL: "https://id.twitch.tv/oauth2/token",
+		},
+		RedirectURL: "http://localhost:8080/oauth2/twitch/callback",
+		Scopes:      []string{"openid"},
+	}
+}
+
+func fetchTokenFromTwitch(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token, error) {
 	var (
 		// jobQueue contains a queue of all jobs waiting for a token.
 		//

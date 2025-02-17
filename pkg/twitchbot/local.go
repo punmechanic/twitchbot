@@ -2,9 +2,9 @@ package twitchbot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
-	"os"
 
 	"example.com/twitchbot/pkg/twitch"
 	"example.com/twitchbot/pkg/twitch/eventsub"
@@ -13,33 +13,22 @@ import (
 
 // runLocal attempts to run the twitch bot locally.
 func runLocal(ctx context.Context) error {
-	// Twitch seems to let us do localhost during test but I don't know if they would allow it in production...
-	//
-	// If not, that means spinning up complex infrastructure where we have an Oauth2 flow that the twitch bot (conduit,
-	// I guess) uses to interact w/ twitch and we have to develop a client the end-user can use to interact with ours,
-	// and that client would use the public flow
-	//
-	// tbh the latter is likely more approachable for most twitch users.
-	cfg := oauth2.Config{
-		ClientID:     os.Getenv("TWITCH_CLIENT_ID"),
-		ClientSecret: os.Getenv("TWITCH_CLIENT_SECRET"),
-		// From https://id.twitch.tv/oauth2/.well-known/openid-configuration
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://id.twitch.tv/oauth2/authorize",
-			TokenURL: "https://id.twitch.tv/oauth2/token",
-		},
-		RedirectURL: "http://localhost:8080/oauth2/twitch/callback",
-		Scopes:      []string{"openid"},
-	}
+	var (
+		cfg              = initTwitchConfig()
+		usedKeyringToken = true
+	)
 
-	tok, err := fetchInitialToken(ctx, &cfg)
+	token, err := fetchTokenFromKeyring()
 	if err != nil {
-		return fmt.Errorf("fetch initial token: %w", ctx.Err())
+		usedKeyringToken = false
+		token, err = fetchTokenFromTwitch(ctx, cfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Our websocket is useless without having a valid token for the Twitch API, so wait to have one before we continue.
-	client := twitch.New(&cfg, tok)
-
+	client := twitch.New(cfg, token)
 	conn, err := eventsub.Dial(ctx)
 	if err != nil {
 		return fmt.Errorf("init websocket: %s", err)
@@ -56,7 +45,24 @@ func runLocal(ctx context.Context) error {
 
 	err = client.SubscribeEvents(ctx, <-conn.SessionID, []string{"channel_follow"})
 	if err != nil {
+		var retrieveErr *oauth2.RetrieveError
+		if errors.As(err, &retrieveErr) && usedKeyringToken {
+			// If we are here, it means that the token in the keyring has expired.  We will need to re-subscribe.
+			// And, since fetching a new token might take longer than the 10 seconds twitch gives us before killing
+			// our websocket, we will also need to re-Dial.
+			// TODO: implement this
+			panic("not yet implemented")
+		}
+
 		return fmt.Errorf("setup events: %s", err)
+	}
+
+	// If we got here, the token we used was valid, and we should store it.
+	// TODO: If the token changes while the bot is running, we will still be storing the old value. We should make sure
+	// to catch any new tokens if the token is refreshed. We can probably do this by exposing a channel on twitch.Client
+	if err := saveTokenInKeyring(token); err != nil {
+		// Print a warning but don't die
+		log.Printf("could not save token to OS keyring: %s", err)
 	}
 
 	for {
