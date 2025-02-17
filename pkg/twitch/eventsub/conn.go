@@ -3,11 +3,13 @@ package eventsub
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 
 	"example.com/twitchbot/pkg/twitch/events"
+	"example.com/twitchbot/pkg/twitch/eventsub/subscriptions"
 	"golang.org/x/net/websocket"
 )
 
@@ -22,9 +24,10 @@ func Dial(ctx context.Context) (*Conn, error) {
 	}
 
 	conn := &Conn{
-		r:               ws,
-		SessionID:       make(chan string, 1),
-		ChannelFollowed: make(chan events.ChannelFollow),
+		r:                  ws,
+		SessionID:          make(chan string, 1),
+		ChannelFollowed:    make(chan events.ChannelFollow),
+		ChannelChatMessage: make(chan events.ChannelChatMessage),
 	}
 
 	return conn, err
@@ -42,23 +45,35 @@ type Conn struct {
 	SessionID chan string
 	r         io.ReadCloser
 
-	ChannelFollowed chan events.ChannelFollow
+	ChannelFollowed    chan events.ChannelFollow
+	ChannelChatMessage chan events.ChannelChatMessage
 }
 
 func (c *Conn) processNotification(notification *Notification) error {
 	// Parse the notification data, and then pass it to the appropriate channels.
 	var (
-		channelFollow events.ChannelFollow
+		channelFollow      events.ChannelFollow
+		channelChatMessage events.ChannelChatMessage
+		err                error
 	)
 
-	switch typ := notification.Subscription.Type; typ {
-	case "channel_follow":
-		if err := json.Unmarshal(notification.Event, &channelFollow); err != nil {
-			return err
+	typ := notification.Subscription.Type
+	switch typ {
+	case subscriptions.ChannelFollow.Name:
+		err = json.Unmarshal(notification.Event, &channelFollow)
+		if err == nil {
+			c.ChannelFollowed <- channelFollow
 		}
-		c.ChannelFollowed <- channelFollow
+	case subscriptions.ChannelChatMessage.Name:
+		err := json.Unmarshal(notification.Event, &channelChatMessage)
+		if err == nil {
+			c.ChannelChatMessage <- channelChatMessage
+		}
 	default:
 		return fmt.Errorf("unknown subscription type %q", typ)
+	}
+	if err != nil {
+		return &UnmarshalEventErr{JSON: string(notification.Event), Type: typ, Cause: err}
 	}
 
 	return nil
@@ -75,13 +90,20 @@ func (c *Conn) serveMessage(_ context.Context, msg *message) error {
 		c.SessionID <- payload.Session.ID
 	case "keepalive":
 	case "notification":
-		var payload Notification
+		var (
+			payload           Notification
+			unmarshalEventErr *UnmarshalEventErr
+		)
+
 		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 			return err
 		}
 
 		err := c.processNotification(&payload)
-		if err != nil {
+		if errors.As(err, &unmarshalEventErr) {
+			// Silently drop, but don't kill the bot.
+			log.Printf("%s", err)
+		} else if err != nil {
 			return err
 		}
 	}
@@ -105,4 +127,14 @@ func (c *Conn) Listen() error {
 			return err
 		}
 	}
+}
+
+type UnmarshalEventErr struct {
+	JSON  string
+	Type  string
+	Cause error
+}
+
+func (e *UnmarshalEventErr) Error() string {
+	return fmt.Sprintf("unmarshal event %s, JSON: %s: %s", e.Type, e.JSON, e.Cause)
 }

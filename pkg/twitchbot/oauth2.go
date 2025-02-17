@@ -58,7 +58,7 @@ func runServerForCallback(ctx context.Context, cfg *oauth2.Config, ch <-chan tok
 	return server.ListenAndServe()
 }
 
-func initTwitchConfig() *oauth2.Config {
+func initTwitchConfig(scopes []string) *oauth2.Config {
 	// Twitch seems to let us do localhost during test but I don't know if they would allow it in production...
 	//
 	// If not, that means spinning up complex infrastructure where we have an Oauth2 flow that the twitch bot (conduit,
@@ -75,7 +75,7 @@ func initTwitchConfig() *oauth2.Config {
 			TokenURL: "https://id.twitch.tv/oauth2/token",
 		},
 		RedirectURL: "http://localhost:8080/oauth2/twitch/callback",
-		Scopes:      []string{"openid"},
+		Scopes:      append(scopes, "openid"),
 	}
 }
 

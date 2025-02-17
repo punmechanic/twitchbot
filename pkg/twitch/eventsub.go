@@ -5,10 +5,17 @@ import (
 	"fmt"
 
 	"example.com/twitchbot/pkg/twitch/eventsub"
+	"example.com/twitchbot/pkg/twitch/eventsub/subscriptions"
 	"golang.org/x/sync/errgroup"
 )
 
-func (c *Client) SubscribeEvents(ctx context.Context, sessionID string, events []string) error {
+type SubscribeRequest struct {
+	Type      subscriptions.Type
+	Condition eventsub.Condition
+	Transport eventsub.Transport
+}
+
+func (c *Client) SubscribeEvents(ctx context.Context, events []*SubscribeRequest) error {
 	var (
 		maxConcurrency = 10
 		grp, reqCtx    = errgroup.WithContext(ctx)
@@ -17,18 +24,12 @@ func (c *Client) SubscribeEvents(ctx context.Context, sessionID string, events [
 
 	for _, event := range events {
 		grp.Go(func() error {
-			req := eventsub.SubscribeRequest{
-				Type:    event,
-				Version: "1",
-				Condition: eventsub.Condition{
-					UserID: "meppermintpocha",
-				},
-				Transport: eventsub.Transport{
-					Method:    eventsub.MethodWebsocket,
-					SessionID: sessionID,
-				},
-			}
-			_, err := eventsub.Subscribe(reqCtx, c, &req)
+			_, err := eventsub.Subscribe(reqCtx, c, &eventsub.SubscribeRequest{
+				Type:      event.Type.Name,
+				Version:   event.Type.Version,
+				Transport: event.Transport,
+				Condition: event.Condition,
+			})
 			if err != nil {
 				return fmt.Errorf("subscribe: %w", err)
 			}

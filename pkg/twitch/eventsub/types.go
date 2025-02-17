@@ -19,8 +19,14 @@ var (
 
 type Status string
 
+// Condition is a list of all conditions for all eventsub evnt types.
+//
+// Check the documentation for which conditions are valid with which eventsub event types.
+// https://dev.twitch.tv/docs/eventsub/eventsub-reference/
 type Condition struct {
-	UserID string `json:"user_id,omitempty"`
+	UserID            string `json:"user_id,omitempty"`
+	BroadcasterUserID string `json:"broadcaster_user_id,omitempty"`
+	ModeratorUserID   string `json:"moderator_user_id,omitempty"`
 }
 
 type Transport struct {

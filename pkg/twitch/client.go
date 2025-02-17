@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 
@@ -24,17 +23,28 @@ func (*Client) NewRequest(ctx context.Context, method, path string, data any) (*
 		Host:   "api.twitch.tv",
 		Path:   path,
 	}
-	buf, err := json.Marshal(data)
+
+	var r io.Reader
+	urlValues, isURLEncoded := data.(url.Values)
+	if isURLEncoded {
+		uri.RawQuery = urlValues.Encode()
+	} else {
+		buf, err := json.Marshal(data)
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewReader(buf)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, uri.String(), r)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println(string(buf))
-	req, err := http.NewRequestWithContext(ctx, method, uri.String(), bytes.NewReader(buf))
-	if err != nil {
-		return nil, err
+	if !isURLEncoded {
+		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Content-Type", "application/json")
+
 	return req, nil
 }
 
