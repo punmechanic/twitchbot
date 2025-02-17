@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -10,9 +11,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func main() {
-	ctx := context.Background()
-
+// runLocal attempts to run the twitch bot locally.
+func runLocal(ctx context.Context) error {
 	// TODO: Try to add Public flow using localhost
 	// Twitch seems to let us do localhost during test but I don't know if they would allow it in production...
 	//
@@ -33,28 +33,41 @@ func main() {
 
 	conn, err := eventsub.Dial(ctx)
 	if err != nil {
-		log.Fatalf("init websocket: %s", err)
+		return fmt.Errorf("init websocket: %s", err)
 	}
 
+	listenErrCh := make(chan error, 1)
 	go func() {
 		err = conn.Listen()
 		if err != nil {
-			log.Fatalf("closed with error: %s", err)
+			listenErrCh <- err
 		}
+		close(listenErrCh)
 	}()
 
 	err = client.SubscribeEvents(ctx, <-conn.SessionID, []string{"channel_follow"})
 	if err != nil {
-		log.Fatalf("setup events: %s", err)
+		return fmt.Errorf("setup events: %s", err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return ctx.Err()
+		case err := <-listenErrCh:
+			return fmt.Errorf("listener error: %w", err)
 		case ev := <-conn.ChannelFollowed:
 			log.Printf("follow: %#v", ev)
 		}
+	}
+}
+
+func main() {
+	ctx := context.Background()
+
+	err := runLocal(ctx)
+	if err != nil {
+		log.Fatalln(err.Error())
 	}
 }
 
