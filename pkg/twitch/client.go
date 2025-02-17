@@ -38,8 +38,7 @@ func (*Client) NewRequest(ctx context.Context, method, path string, data any) (*
 
 func (c *Client) Execute(ctx context.Context, r *http.Request, dst any) error {
 	r2 := r.Clone(ctx)
-	r.Header.Set("X-Client-Id", c.Config.ClientID)
-
+	r2.Header.Set("Client-Id", c.Config.ClientID)
 	resp, err := c.HttpClient.Do(r2)
 	if err != nil {
 		return err
