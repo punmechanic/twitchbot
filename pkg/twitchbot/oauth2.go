@@ -2,8 +2,8 @@ package twitchbot
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/pkg/browser"
@@ -19,21 +19,35 @@ type tokenFetchJob struct {
 	Verifier, State string
 }
 
+func serveCallback(cfg *oauth2.Config, ch <-chan tokenFetchJob) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO: Remove panics
+		var job tokenFetchJob
+		select {
+		case job = <-ch:
+			break
+		case <-r.Context().Done():
+			// timeout
+			panic("timeout")
+		}
+
+		// TODO: Verify state
+		// Client side check so I don't care to do it right now
+		token, err := cfg.Exchange(r.Context(), r.FormValue("code"), oauth2.S256ChallengeOption(job.Verifier))
+		if err != nil {
+			panic(fmt.Sprintf("token exchange: %s", err))
+		}
+
+		job.C <- token
+		fmt.Fprintln(w, "You can close this window now.")
+	})
+}
+
 // runServerForCallback runs a HTTP server listening for a valid OAuth2 callback.
 func runServerForCallback(ctx context.Context, cfg *oauth2.Config, ch <-chan tokenFetchJob) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/oauth2/{provider}/callback", func(w http.ResponseWriter, r *http.Request) {
-		select {
-		case <-ch:
-			log.Println(r.PathValue("provider"))
-		case <-r.Context().Done():
-			// timeout
-		}
-	})
-	server := http.Server{
-		Handler: mux,
-		Addr:    ":8080",
-	}
+	mux.Handle("/oauth2/{provider}/callback", serveCallback(cfg, ch))
+	server := http.Server{Handler: mux, Addr: ":8080"}
 
 	go func() {
 		<-ctx.Done()
