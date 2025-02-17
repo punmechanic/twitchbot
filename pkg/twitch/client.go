@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 )
@@ -31,7 +30,12 @@ func (*Client) NewRequest(ctx context.Context, method, path string, data any) (*
 		return nil, err
 	}
 
-	return http.NewRequestWithContext(ctx, method, uri.String(), bytes.NewReader(buf))
+	req, err := http.NewRequestWithContext(ctx, method, uri.String(), bytes.NewReader(buf))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return req, nil
 }
 
 func (c *Client) Execute(ctx context.Context, r *http.Request, dst any) error {
@@ -45,20 +49,40 @@ func (c *Client) Execute(ctx context.Context, r *http.Request, dst any) error {
 		return err
 	}
 
-	return c.parseResponse(resp, dst)
+	return parseResponse(resp, dst)
 }
 
-func (c *Client) parseResponse(resp *http.Response, dst any) error {
+func parseBadResponse(resp *http.Response) error {
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case http.StatusBadRequest:
+		var badRequestErr BadRequestError
+		if err := json.Unmarshal(buf, &badRequestErr); err != nil {
+			return err
+		}
+		return badRequestErr
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	default:
+		return fmt.Errorf("status code %d", resp.StatusCode)
+	}
+}
+
+func parseResponse(resp *http.Response, dst any) error {
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		log.Printf("status code %d", resp.StatusCode)
-		// impl
-		panic("not yet implemented")
+		return parseBadResponse(resp)
 	}
 
 	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
+
 	return json.Unmarshal(buf, dst)
 }
 
