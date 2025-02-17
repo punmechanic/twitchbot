@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"example.com/twitchbot/pkg/twitch/eventsub"
-	"example.com/twitchbot/pkg/twitch/eventsub/subscriptions"
+	"example.com/twitchbot/pkg/twitch/subscriptions"
 	"golang.org/x/sync/errgroup"
 )
 

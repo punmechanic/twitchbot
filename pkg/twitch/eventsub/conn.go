@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"example.com/twitchbot/pkg/twitch/events"
-	"example.com/twitchbot/pkg/twitch/eventsub/subscriptions"
+	"example.com/twitchbot/pkg/twitch/subscriptions"
 	"golang.org/x/net/websocket"
 )
 

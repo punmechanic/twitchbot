@@ -8,7 +8,7 @@ import (
 
 	"example.com/twitchbot/pkg/twitch"
 	"example.com/twitchbot/pkg/twitch/eventsub"
-	"example.com/twitchbot/pkg/twitch/eventsub/subscriptions"
+	"example.com/twitchbot/pkg/twitch/subscriptions"
 	"golang.org/x/oauth2"
 )
 
