@@ -1,6 +1,7 @@
 package twitchbot
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -33,4 +34,14 @@ func saveTokenInKeyring(token *oauth2.Token) error {
 	}
 
 	return keyring.Set("twitchbot", "twitch:tokens", buf.String())
+}
+
+func fetchTokenWithFallback(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token, bool, error) {
+	token, err := fetchTokenFromKeyring()
+	if err == nil {
+		return token, true, nil
+	}
+
+	token, err = fetchTokenFromTwitch(ctx, cfg)
+	return token, false, err
 }

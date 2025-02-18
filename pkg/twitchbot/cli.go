@@ -3,7 +3,6 @@ package twitchbot
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	"example.com/twitchbot/pkg/twitch"
@@ -42,13 +41,8 @@ func Run(ctx context.Context) error {
 
 func lookupBroadcasterByLoginName(ctx context.Context, c *cli.Command) error {
 	cfg := initTwitchConfig([]string{"user:read:chat"})
-	token, err := fetchTokenFromKeyring()
-	if err != nil {
-		token, err = fetchTokenFromTwitch(ctx, cfg)
-		if err != nil {
-			return err
-		}
-	}
+	token, _, err := fetchTokenWithFallback(ctx, cfg)
+	defer saveTokenInKeyring(token)
 
 	client := twitch.New(cfg, token)
 	users, err := client.Users(ctx, &twitch.UsersRequest{
@@ -63,9 +57,5 @@ func lookupBroadcasterByLoginName(ctx context.Context, c *cli.Command) error {
 		fmt.Fprintf(c.Writer, "%s\n", user.ID)
 	}
 
-	if err := saveTokenInKeyring(token); err != nil {
-		// Print a warning but don't die
-		log.Printf("could not save token to OS keyring: %s", err)
-	}
 	return nil
 }

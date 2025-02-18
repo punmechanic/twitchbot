@@ -16,18 +16,11 @@ import (
 func serve(ctx context.Context) error {
 	var (
 		cfg                       = initTwitchConfig([]string{"user:read:chat"})
-		usedKeyringToken          = true
 		userID, broadcasterUserID string
 	)
 
-	token, err := fetchTokenFromKeyring()
-	if err != nil {
-		usedKeyringToken = false
-		token, err = fetchTokenFromTwitch(ctx, cfg)
-		if err != nil {
-			return err
-		}
-	}
+	token, usedKeyringToken, err := fetchTokenWithFallback(ctx, cfg)
+	defer saveTokenInKeyring(token)
 
 	// Our websocket is useless without having a valid token for the Twitch API, so wait to have one before we continue.
 	client := twitch.New(cfg, token)
@@ -87,14 +80,6 @@ func serve(ctx context.Context) error {
 		}
 
 		return fmt.Errorf("setup events: %s", err)
-	}
-
-	// If we got here, the token we used was valid, and we should store it.
-	// TODO: If the token changes while the bot is running, we will still be storing the old value. We should make sure
-	// to catch any new tokens if the token is refreshed. We can probably do this by exposing a channel on twitch.Client
-	if err := saveTokenInKeyring(token); err != nil {
-		// Print a warning but don't die
-		log.Printf("could not save token to OS keyring: %s", err)
 	}
 
 	log.Println("listening for events")
