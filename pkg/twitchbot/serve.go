@@ -12,8 +12,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// runLocal attempts to run the twitch bot locally.
-func runLocal(ctx context.Context) error {
+// serve runs the Twitch bot.
+func serve(ctx context.Context) error {
 	var (
 		cfg                       = initTwitchConfig([]string{"user:read:chat"})
 		usedKeyringToken          = true

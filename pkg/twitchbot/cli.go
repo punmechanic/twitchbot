@@ -10,9 +10,9 @@ import (
 var Root = cli.Command{
 	Commands: []*cli.Command{
 		{
-			Name: "local",
+			Name: "serve",
 			Action: func(ctx context.Context, _ *cli.Command) error {
-				return runLocal(ctx)
+				return serve(ctx)
 			},
 		},
 	},
