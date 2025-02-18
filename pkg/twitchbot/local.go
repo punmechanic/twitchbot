@@ -97,6 +97,7 @@ func runLocal(ctx context.Context) error {
 		log.Printf("could not save token to OS keyring: %s", err)
 	}
 
+	log.Println("listening for events")
 	for {
 		select {
 		case <-ctx.Done():
