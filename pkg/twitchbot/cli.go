@@ -13,24 +13,26 @@ var Root = cli.Command{
 	Commands: []*cli.Command{
 		{
 			Name: "serve",
-			Action: func(ctx context.Context, _ *cli.Command) error {
-				return serve(ctx)
-			},
-		},
-		{
-			Name: "util",
-			Commands: []*cli.Command{
-				{
-					Name: "lookup-broadcaster-id",
-					Arguments: []cli.Argument{
-						&cli.StringArg{
-							Name: "broadcaster_id",
-							Max:  -1,
-						},
-					},
-					Action: lookupBroadcasterByLoginName,
+			Flags: []cli.Flag{
+				&cli.StringSliceFlag{
+					Name: "broadcaster-ids",
 				},
 			},
+			Action: serve,
+		},
+		{
+			Name: "lookup-broadcaster-id",
+			Arguments: []cli.Argument{
+				&cli.StringArg{
+					Name: "broadcaster_id",
+					Min:  0,
+					// Setting Max to -1 seems to break argument parsing in urfave/cli, and urfave will discard
+					// any arguments passed. Commenting out this line fixes that problem but shows us a warning.
+					// Line is commented out for now so we can work
+					// Max: -1,
+				},
+			},
+			Action: lookupBroadcasterByLoginName,
 		},
 	},
 }

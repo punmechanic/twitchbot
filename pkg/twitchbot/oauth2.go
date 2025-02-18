@@ -2,6 +2,7 @@ package twitchbot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,4 +121,35 @@ func fetchTokenFromTwitch(ctx context.Context, cfg *oauth2.Config) (*oauth2.Toke
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+type userInfo struct {
+	Sub string `json:"sub"`
+}
+
+func fetchUserInfo(ctx context.Context, cfg *oauth2.Config, tok *oauth2.Token) (*userInfo, error) {
+	client := cfg.Client(ctx, tok)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://id.twitch.tv/oauth2/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("response code %d", resp.StatusCode)
+	}
+
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var userInfo userInfo
+	err = json.Unmarshal(buf, &userInfo)
+	return &userInfo, err
 }

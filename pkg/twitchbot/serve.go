@@ -9,40 +9,30 @@ import (
 	"example.com/twitchbot/pkg/twitch"
 	"example.com/twitchbot/pkg/twitch/eventsub"
 	"example.com/twitchbot/pkg/twitch/subscriptions"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/oauth2"
 )
 
 // serve runs the Twitch bot.
-func serve(ctx context.Context) error {
+func serve(ctx context.Context, c *cli.Command) error {
 	var (
-		cfg                       = initTwitchConfig([]string{"user:read:chat"})
-		userID, broadcasterUserID string
+		cfg                     = initTwitchConfig([]string{"user:read:chat"})
+		broadcasterIDs []string = c.StringSlice("broadcaster-ids")
 	)
 
 	token, usedKeyringToken, err := fetchTokenWithFallback(ctx, cfg)
 	defer saveTokenInKeyring(token)
 
+	userInfo, err := fetchUserInfo(ctx, cfg, token)
+	if err != nil {
+		return fmt.Errorf("fetch user info: %w", err)
+	}
+
 	// Our websocket is useless without having a valid token for the Twitch API, so wait to have one before we continue.
 	client := twitch.New(cfg, token)
-	// We need to get the user IDs!
-	users, err := client.Users(ctx, &twitch.UsersRequest{
-		Login: []string{"punmechanic", "piratesoftware"},
-	})
-	if err != nil {
-		return fmt.Errorf("fetch users: %w", err)
-	}
-
-	for _, user := range users.Data {
-		if user.Login == "punmechanic" {
-			userID = user.ID
-		} else if user.Login == "piratesoftware" {
-			broadcasterUserID = user.ID
-		}
-	}
-
 	conn, err := eventsub.Dial(ctx)
 	if err != nil {
-		return fmt.Errorf("init websocket: %s", err)
+		return fmt.Errorf("init websocket: %w", err)
 	}
 
 	listenErrCh := make(chan error, 1)
@@ -55,19 +45,22 @@ func serve(ctx context.Context) error {
 	}()
 
 	id := <-conn.SessionID
-	err = client.SubscribeEvents(ctx, []*twitch.SubscribeRequest{
-		{
+
+	var reqs []*twitch.SubscribeRequest
+	for _, broadcasterID := range broadcasterIDs {
+		reqs = append(reqs, &twitch.SubscribeRequest{
 			Type: subscriptions.ChannelChatMessage,
 			Condition: eventsub.Condition{
-				UserID:            userID,
-				BroadcasterUserID: broadcasterUserID,
+				UserID:            userInfo.Sub,
+				BroadcasterUserID: broadcasterID,
 			},
 			Transport: eventsub.Transport{
 				Method:    eventsub.MethodWebsocket,
 				SessionID: id,
 			},
-		},
-	})
+		})
+	}
+	err = client.SubscribeEvents(ctx, reqs)
 
 	if err != nil {
 		var retrieveErr *oauth2.RetrieveError
